@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin - Nilgiri Store</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;background:#f3f4f6;margin:0;padding:18px}
+  .wrap{max-width:1100px;margin:0 auto}
+  .card{background:#fff;padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.04);margin-bottom:12px}
+  input,textarea,select{padding:8px;border-radius:6px;border:1px solid #ddd;width:100%;box-sizing:border-box;margin-top:6px}
+  .row{display:flex;gap:8px}
+  .row > *{flex:1}
+  button{background:#0ea5e9;color:#fff;border:none;padding:8px 10px;border-radius:8px;cursor:pointer}
+  .btn-muted{background:#fff;color:#0ea5e9;border:1px solid #0ea5e9}
+  .muted{color:#666;font-size:13px}
+  .prod-row{display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid #eee}
+  .prod-row img{width:86px;height:56px;object-fit:cover;border-radius:6px}
+  .actions{display:flex;gap:8px}
+  .status-select{padding:6px;border-radius:6px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2>Admin Login</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="adminPass" placeholder="Admin password डालें" />
+        <button id="adminLoginBtn">Login</button>
+        <button id="backHome" class="btn-muted">Back Home</button>
+      </div>
+      <div class="muted" style="margin-top:8px">Admin password: <strong>5702</strong></div>
+    </div>
+
+    <div id="adminArea" class="hide">
+      <div class="card">
+        <h3>Add Product</h3>
+        <input id="pTitle" placeholder="Title" />
+        <div class="row">
+          <input id="pPrice" placeholder="Price (number)" />
+          <input id="pCategory" placeholder="Category (e.g., Groceries)" />
+        </div>
+        <input id="pImage" placeholder="Image URL (paste direct link here)" />
+        <textarea id="pDesc" placeholder="Description (जो Home पर दिखे)"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="addProductBtn">Add Product</button>
+          <button id="clearProducts" class="btn-muted">Clear All Products</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Notice Board (Home पर दिखेगा)</h3>
+        <textarea id="noticeText" placeholder="यहाँ notice लिखें..." style="width:100%;height:80px"></textarea>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <button id="saveNotice">Save Notice</button>
+          <button id="clearNotice" class="btn-muted">Clear Notice</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Products</h3>
+        <div id="productsList"></div>
+      </div>
+
+      <div class="card">
+        <h3>Orders</h3>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <button id="refreshOrders">Refresh</button>
+          <button id="clearOrders" class="btn-muted">Clear All Orders</button>
+        </div>
+        <div id="ordersList"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const ADMIN_PW = '5702';
+  const K_PRODUCTS = 'np_products_v7';
+  const K_ORDERS = 'np_orders_v7';
+  const K_NOTICE = 'np_notice_v1';
+
+  const $ = s => document.querySelector(s);
+  const load = k => JSON.parse(localStorage.getItem(k) || 'null');
+  const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+  const uid = ()=> 'id'+Date.now().toString(36);
+
+  $('#backHome').addEventListener('click', ()=> window.location.href='index.html');
+
+  $('#adminLoginBtn').addEventListener('click', ()=>{
+    const pw = $('#adminPass').value || '';
+    if(pw === ADMIN_PW){
+      $('#adminArea').classList.remove('hide');
+      alert('Admin logged in');
+      renderProducts(); renderOrders(); renderNotice();
+    } else alert('Wrong password');
+  });
+
+  // add product
+  $('#addProductBtn').addEventListener('click', ()=>{
+    const t = $('#pTitle').value.trim();
+    const pr = parseFloat($('#pPrice').value) || 0;
+    const cat = $('#pCategory').value.trim() || 'General';
+    const img = $('#pImage').value.trim() || '';
+    const desc = $('#pDesc').value.trim() || '';
+    if(!t || !pr){ alert('Title और Price डालें'); return; }
+    let products = load(K_PRODUCTS) || [];
+    products.push({ id: uid(), title: t, price: pr, category: cat, image: img, description: desc });
+    save(K_PRODUCTS, products);
+    $('#pTitle').value=''; $('#pPrice').value=''; $('#pCategory').value=''; $('#pImage').value=''; $('#pDesc').value='';
+    renderProducts();
+  });
+
+  $('#clearProducts').addEventListener('click', ()=>{
+    if(confirm('सभी products हटाए जाएँगे?')){ localStorage.removeItem(K_PRODUCTS); renderProducts(); alert('Products cleared'); }
+  });
+
+  function renderProducts(){
+    const node = $('#productsList'); node.innerHTML = '';
+    const products = load(K_PRODUCTS) || [];
+    if(!products || products.length===0){ node.innerHTML = '<div class="muted">No products</div>'; return; }
+    products.slice().reverse().forEach(p=>{
+      const d = document.createElement('div'); d.className='prod-row';
+      const img = p.image ? `<img src="${p.image}" />` : `<div style="width:86px;height:56px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#999">No Img</div>`;
+      d.innerHTML = `${img}<div style="flex:1"><strong>${escapeHtml(p.title)}</strong><div class="muted">₹${p.price} • ${escapeHtml(p.category)}</div><div class="muted" style="margin-top:6px">${escapeHtml(p.description)}</div></div>
+        <div class="actions">
+          <button onclick="editProduct('${p.id}')">Edit</button>
+          <button onclick="deleteProduct('${p.id}')" style="background:#ef4444">Delete</button>
+        </div>`;
+      node.appendChild(d);
+    });
+  }
+
+  function deleteProduct(id){
+    if(!confirm('Delete product?')) return;
+    let products = load(K_PRODUCTS) || [];
+    products = products.filter(p=>p.id !== id);
+    save(K_PRODUCTS, products);
+    renderProducts();
+  }
+
+  function editProduct(id){
+    let products = load(K_PRODUCTS) || [];
+    const p = products.find(x=>x.id===id);
+    if(!p) return alert('Not found');
+    $('#pTitle').value = p.title; $('#pPrice').value = p.price; $('#pCategory').value = p.category; $('#pImage').value = p.image; $('#pDesc').value = p.description;
+    // remove old and let Add button re-add updated
+    deleteProduct(id);
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  // Notice board
+  $('#saveNotice').addEventListener('click', ()=> {
+    const n = $('#noticeText').value.trim();
+    localStorage.setItem(K_NOTICE, n);
+    alert('Notice saved');
+  });
+  $('#clearNotice').addEventListener('click', ()=> {
+    if(confirm('Clear notice?')){ localStorage.removeItem(K_NOTICE); $('#noticeText').value=''; alert('Notice cleared'); }
+  });
+  function renderNotice(){
+    const n = localStorage.getItem(K_NOTICE) || '';
+    $('#noticeText').value = n;
+  }
+
+  // orders
+  $('#refreshOrders').addEventListener('click', renderOrders);
+  $('#clearOrders').addEventListener('click', ()=>{
+    if(confirm('Clear all orders?')){ localStorage.removeItem(K_ORDERS); renderOrders(); alert('Orders cleared'); }
+  });
+
+  function renderOrders(){
+    const node = $('#ordersList'); node.innerHTML = '';
+    const orders = load(K_ORDERS) || [];
+    if(!orders || orders.length===0){ node.innerHTML = '<div class="muted">No orders</div>'; return; }
+    orders.slice().reverse().forEach(o=>{
+      const div = document.createElement('div'); div.className='card'; div.style.marginBottom='8px';
+      div.innerHTML = `<div style="display:flex;justify-content:space-between"><div><strong>${escapeHtml(o.name)}</strong><div class="muted">${o.mobile} • Block:${escapeHtml(o.block)} | Flat:${escapeHtml(o.flat)}</div></div><div class="muted">${new Date(o.createdAt).toLocaleString()}</div></div>
+        <div style="margin-top:8px">${o.items.map(it=>escapeHtml(it.title)+' x'+it.qty).join('<br>')}</div>
+        <div style="margin-top:8px"><strong>Total: ₹${o.total}</strong></div>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <label class="muted">Status: </label>
+          <select class="status-select" data-id="${o.id}" onchange="changeStatus(this.dataset.id,this.value)">
+            <option value="Pending"${o.status==='Pending'?' selected':''}>Pending</option>
+            <option value="Delivered"${o.status==='Delivered'?' selected':''}>Delivered</option>
+            <option value="Cancelled"${o.status==='Cancelled'?' selected':''}>Cancelled</option>
+          </select>
+          <button onclick="notifyCustomer('${o.id}')" style="margin-left:auto">Notify on WhatsApp</button>
+        </div>`;
+      node.appendChild(div);
+    });
+  }
+
+  function changeStatus(id, status){
+    let orders = load(K_ORDERS) || [];
+    const o = orders.find(x=>x.id === id);
+    if(!o) return;
+    o.status = status;
+    save(K_ORDERS, orders);
+    renderOrders();
+    alert('Order status updated to ' + status);
+  }
+
+  function notifyCustomer(orderId){
+    const orders = load(K_ORDERS) || [];
+    const o = orders.find(x=>x.id === orderId);
+    if(!o) return alert('Order not found');
+    const msg = `Namaste ${o.name},%0AYour order (${o.id}) status: ${encodeURIComponent(o.status)}.%0AItems:%0A${o.items.map(it=>encodeURIComponent(it.title)+' x'+it.qty).join('%0A')}%0AThank you.`;
+    // opens chat with customer (their mobile)
+    if(!o.mobile) return alert('Customer mobile not available');
+    window.open(`https://wa.me/${o.mobile.replace(/\D/g,'')}?text=${msg}`,'_blank');
+  }
+
+  function changeStatus(id, status){ // defined twice to ensure availability
+    let orders = load(K_ORDERS) || [];
+    const o = orders.find(x=>x.id === id);
+    if(!o) return;
+    o.status = status;
+    save(K_ORDERS, orders);
+    renderOrders();
+    alert('Order status updated to ' + status);
+  }
+
+  function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+
+  // initial admin screen stays hidden until login
+</script>
+</body>
+</html>
