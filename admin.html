@@ -18,36 +18,31 @@
   .prod-row img{width:86px;height:56px;object-fit:cover;border-radius:6px}
   .actions{display:flex;gap:8px}
   .status-select{padding:6px;border-radius:6px}
-  .hide {display:none !important;}
+  .hide{display:none}
 </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="card" id="loginArea">
+    <div class="card">
       <h2>Admin Login</h2>
       <div style="display:flex;gap:8px;align-items:center">
         <input id="adminPass" placeholder="Admin password डालें" />
         <button id="adminLoginBtn">Login</button>
         <button id="backHome" class="btn-muted">Back Home</button>
       </div>
-      <div class="muted" style="margin-top:8px">Admin password: <strong>only admin operate</strong></div>
     </div>
 
     <div id="adminArea" class="hide">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h2>Admin Panel</h2>
-        <button id="logoutBtn" class="btn-muted">Logout</button>
-      </div>
-
       <div class="card">
         <h3>Add Product</h3>
         <input id="pTitle" placeholder="Title" />
         <div class="row">
-          <input id="pPrice" placeholder="Price (number)" />
-          <input id="pCategory" placeholder="Category (e.g., Groceries)" />
+          <input id="pPrice" placeholder="Selling Price (₹)" />
+          <input id="pCostPrice" placeholder="Cost Price (₹)" /> <!-- नया फ़ील्ड -->
+          <input id="pCategory" placeholder="Category" />
         </div>
-        <input id="pImage" placeholder="Image URL (paste direct link here)" />
-        <textarea id="pDesc" placeholder="Description (जो Home पर दिखे)"></textarea>
+        <input id="pImage" placeholder="Image URL" />
+        <textarea id="pDesc" placeholder="Description"></textarea>
         <div style="display:flex;gap:8px;margin-top:8px">
           <button id="addProductBtn">Add Product</button>
           <button id="clearProducts" class="btn-muted">Clear All Products</button>
@@ -55,8 +50,8 @@
       </div>
 
       <div class="card">
-        <h3>Notice Board (Home पर दिखेगा)</h3>
-        <textarea id="noticeText" placeholder="यहाँ notice लिखें..." style="width:100%;height:80px"></textarea>
+        <h3>Notice Board</h3>
+        <textarea id="noticeText" style="width:100%;height:80px"></textarea>
         <div style="margin-top:8px;display:flex;gap:8px">
           <button id="saveNotice">Save Notice</button>
           <button id="clearNotice" class="btn-muted">Clear Notice</button>
@@ -74,14 +69,14 @@
           <button id="refreshOrders">Refresh</button>
           <button id="clearOrders" class="btn-muted">Clear All Orders</button>
         </div>
-        <div id="ordersList"></div>
+        <div><strong>Total Profit: ₹<span id="totalProfit">0</span></strong></div>
+        <div id="ordersList" style="margin-top:10px;"></div>
       </div>
     </div>
   </div>
 
 <script>
   const ADMIN_PW = '5702';
-  const ADMIN_FLAG = 'np_admin_logged_in';
   const K_PRODUCTS = 'np_products_v7';
   const K_ORDERS = 'np_orders_v7';
   const K_NOTICE = 'np_notice_v1';
@@ -91,54 +86,30 @@
   const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
   const uid = ()=> 'id'+Date.now().toString(36);
 
-  // Home बटन
   $('#backHome').addEventListener('click', ()=> window.location.href='index.html');
 
-  // Login चेक
-  window.addEventListener('load', () => {
-    if (localStorage.getItem(ADMIN_FLAG) === 'true') {
-      showAdmin();
-    } else {
-      $('#adminArea').classList.add('hide');
-      $('#loginArea').classList.remove('hide');
-    }
-  });
-
-  // Login
   $('#adminLoginBtn').addEventListener('click', ()=>{
     const pw = $('#adminPass').value || '';
     if(pw === ADMIN_PW){
-      localStorage.setItem(ADMIN_FLAG, 'true');
-      showAdmin();
+      $('#adminArea').classList.remove('hide');
       alert('Admin logged in');
+      renderProducts(); renderOrders(); renderNotice();
     } else alert('Wrong password');
   });
 
-  // Logout
-  $('#logoutBtn').addEventListener('click', () => {
-    localStorage.removeItem(ADMIN_FLAG);
-    location.reload();
-  });
-
-  // Login के बाद दिखाओ
-  function showAdmin() {
-    $('#loginArea').classList.add('hide');
-    $('#adminArea').classList.remove('hide');
-    renderProducts(); renderOrders(); renderNotice();
-  }
-
-  // Add product
+  // add product
   $('#addProductBtn').addEventListener('click', ()=>{
     const t = $('#pTitle').value.trim();
     const pr = parseFloat($('#pPrice').value) || 0;
+    const cp = parseFloat($('#pCostPrice').value) || 0; // लागत मूल्य
     const cat = $('#pCategory').value.trim() || 'General';
     const img = $('#pImage').value.trim() || '';
     const desc = $('#pDesc').value.trim() || '';
-    if(!t || !pr){ alert('Title और Price डालें'); return; }
+    if(!t || !pr){ alert('Title और Selling Price डालें'); return; }
     let products = load(K_PRODUCTS) || [];
-    products.push({ id: uid(), title: t, price: pr, category: cat, image: img, description: desc });
+    products.push({ id: uid(), title: t, price: pr, costPrice: cp, category: cat, image: img, description: desc });
     save(K_PRODUCTS, products);
-    $('#pTitle').value=''; $('#pPrice').value=''; $('#pCategory').value=''; $('#pImage').value=''; $('#pDesc').value='';
+    $('#pTitle').value=''; $('#pPrice').value=''; $('#pCostPrice').value=''; $('#pCategory').value=''; $('#pImage').value=''; $('#pDesc').value='';
     renderProducts();
   });
 
@@ -153,7 +124,7 @@
     products.slice().reverse().forEach(p=>{
       const d = document.createElement('div'); d.className='prod-row';
       const img = p.image ? `<img src="${p.image}" />` : `<div style="width:86px;height:56px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#999">No Img</div>`;
-      d.innerHTML = `${img}<div style="flex:1"><strong>${escapeHtml(p.title)}</strong><div class="muted">₹${p.price} • ${escapeHtml(p.category)}</div><div class="muted" style="margin-top:6px">${escapeHtml(p.description)}</div></div>
+      d.innerHTML = `${img}<div style="flex:1"><strong>${escapeHtml(p.title)}</strong><div class="muted">Selling ₹${p.price} | Cost ₹${p.costPrice || 0} • ${escapeHtml(p.category)}</div><div class="muted" style="margin-top:6px">${escapeHtml(p.description)}</div></div>
         <div class="actions">
           <button onclick="editProduct('${p.id}')">Edit</button>
           <button onclick="deleteProduct('${p.id}')" style="background:#ef4444">Delete</button>
@@ -174,12 +145,12 @@
     let products = load(K_PRODUCTS) || [];
     const p = products.find(x=>x.id===id);
     if(!p) return alert('Not found');
-    $('#pTitle').value = p.title; $('#pPrice').value = p.price; $('#pCategory').value = p.category; $('#pImage').value = p.image; $('#pDesc').value = p.description;
+    $('#pTitle').value = p.title; $('#pPrice').value = p.price; $('#pCostPrice').value = p.costPrice || 0; $('#pCategory').value = p.category; $('#pImage').value = p.image; $('#pDesc').value = p.description;
     deleteProduct(id);
     window.scrollTo({top:0, behavior:'smooth'});
   }
 
-  // Notice
+  // Notice board
   $('#saveNotice').addEventListener('click', ()=> {
     const n = $('#noticeText').value.trim();
     localStorage.setItem(K_NOTICE, n);
@@ -193,7 +164,7 @@
     $('#noticeText').value = n;
   }
 
-  // Orders
+  // orders
   $('#refreshOrders').addEventListener('click', renderOrders);
   $('#clearOrders').addEventListener('click', ()=>{
     if(confirm('Clear all orders?')){ localStorage.removeItem(K_ORDERS); renderOrders(); alert('Orders cleared'); }
@@ -202,42 +173,25 @@
   function renderOrders(){
     const node = $('#ordersList'); node.innerHTML = '';
     const orders = load(K_ORDERS) || [];
-    if(!orders || orders.length===0){ node.innerHTML = '<div class="muted">No orders</div>'; return; }
+    let totalProfit = 0;
+    if(!orders || orders.length===0){ node.innerHTML = '<div class="muted">No orders</div>'; $('#totalProfit').innerText = 0; return; }
     orders.slice().reverse().forEach(o=>{
+      let orderProfit = 0;
+      o.items.forEach(it=>{
+        const product = (load(K_PRODUCTS) || []).find(p=>p.title === it.title);
+        if(product){
+          const profitPerItem = (product.price - (product.costPrice || 0));
+          orderProfit += profitPerItem * it.qty;
+        }
+      });
+      totalProfit += orderProfit;
       const div = document.createElement('div'); div.className='card'; div.style.marginBottom='8px';
       div.innerHTML = `<div style="display:flex;justify-content:space-between"><div><strong>${escapeHtml(o.name)}</strong><div class="muted">${o.mobile} • Block:${escapeHtml(o.block)} | Flat:${escapeHtml(o.flat)}</div></div><div class="muted">${new Date(o.createdAt).toLocaleString()}</div></div>
         <div style="margin-top:8px">${o.items.map(it=>escapeHtml(it.title)+' x'+it.qty).join('<br>')}</div>
-        <div style="margin-top:8px"><strong>Total: ₹${o.total}</strong></div>
-        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-          <label class="muted">Status: </label>
-          <select class="status-select" data-id="${o.id}" onchange="changeStatus(this.dataset.id,this.value)">
-            <option value="Pending"${o.status==='Pending'?' selected':''}>Pending</option>
-            <option value="Delivered"${o.status==='Delivered'?' selected':''}>Delivered</option>
-            <option value="Cancelled"${o.status==='Cancelled'?' selected':''}>Cancelled</option>
-          </select>
-          <button onclick="notifyCustomer('${o.id}')" style="margin-left:auto">Notify on WhatsApp</button>
-        </div>`;
+        <div style="margin-top:8px"><strong>Total: ₹${o.total}</strong> | <span class="muted">Profit: ₹${orderProfit.toFixed(2)}</span></div>`;
       node.appendChild(div);
     });
-  }
-
-  function changeStatus(id, status){
-    let orders = load(K_ORDERS) || [];
-    const o = orders.find(x=>x.id === id);
-    if(!o) return;
-    o.status = status;
-    save(K_ORDERS, orders);
-    renderOrders();
-    alert('Order status updated to ' + status);
-  }
-
-  function notifyCustomer(orderId){
-    const orders = load(K_ORDERS) || [];
-    const o = orders.find(x=>x.id === orderId);
-    if(!o) return alert('Order not found');
-    const msg = `Namaste ${o.name},%0AYour order (${o.id}) status: ${encodeURIComponent(o.status)}.%0AItems:%0A${o.items.map(it=>encodeURIComponent(it.title)+' x'+it.qty).join('%0A')}%0AThank you.`;
-    if(!o.mobile) return alert('Customer mobile not available');
-    window.open(`https://wa.me/${o.mobile.replace(/\D/g,'')}?text=${msg}`,'_blank');
+    $('#totalProfit').innerText = totalProfit.toFixed(2);
   }
 
   function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
