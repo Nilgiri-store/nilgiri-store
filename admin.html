@@ -18,21 +18,27 @@
   .prod-row img{width:86px;height:56px;object-fit:cover;border-radius:6px}
   .actions{display:flex;gap:8px}
   .status-select{padding:6px;border-radius:6px}
+  .hide {display:none !important;}
 </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="card">
+    <div class="card" id="loginArea">
       <h2>Admin Login</h2>
       <div style="display:flex;gap:8px;align-items:center">
         <input id="adminPass" placeholder="Admin password डालें" />
         <button id="adminLoginBtn">Login</button>
         <button id="backHome" class="btn-muted">Back Home</button>
       </div>
-      <div class="muted" style="margin-top:8px">Admin password: <strong>only admin operat</strong></div>
+      <div class="muted" style="margin-top:8px">Admin password: <strong>only admin operate</strong></div>
     </div>
 
     <div id="adminArea" class="hide">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2>Admin Panel</h2>
+        <button id="logoutBtn" class="btn-muted">Logout</button>
+      </div>
+
       <div class="card">
         <h3>Add Product</h3>
         <input id="pTitle" placeholder="Title" />
@@ -75,6 +81,7 @@
 
 <script>
   const ADMIN_PW = '5702';
+  const ADMIN_FLAG = 'np_admin_logged_in';
   const K_PRODUCTS = 'np_products_v7';
   const K_ORDERS = 'np_orders_v7';
   const K_NOTICE = 'np_notice_v1';
@@ -84,18 +91,43 @@
   const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
   const uid = ()=> 'id'+Date.now().toString(36);
 
+  // Home बटन
   $('#backHome').addEventListener('click', ()=> window.location.href='index.html');
 
+  // Login चेक
+  window.addEventListener('load', () => {
+    if (localStorage.getItem(ADMIN_FLAG) === 'true') {
+      showAdmin();
+    } else {
+      $('#adminArea').classList.add('hide');
+      $('#loginArea').classList.remove('hide');
+    }
+  });
+
+  // Login
   $('#adminLoginBtn').addEventListener('click', ()=>{
     const pw = $('#adminPass').value || '';
     if(pw === ADMIN_PW){
-      $('#adminArea').classList.remove('hide');
+      localStorage.setItem(ADMIN_FLAG, 'true');
+      showAdmin();
       alert('Admin logged in');
-      renderProducts(); renderOrders(); renderNotice();
     } else alert('Wrong password');
   });
 
-  // add product
+  // Logout
+  $('#logoutBtn').addEventListener('click', () => {
+    localStorage.removeItem(ADMIN_FLAG);
+    location.reload();
+  });
+
+  // Login के बाद दिखाओ
+  function showAdmin() {
+    $('#loginArea').classList.add('hide');
+    $('#adminArea').classList.remove('hide');
+    renderProducts(); renderOrders(); renderNotice();
+  }
+
+  // Add product
   $('#addProductBtn').addEventListener('click', ()=>{
     const t = $('#pTitle').value.trim();
     const pr = parseFloat($('#pPrice').value) || 0;
@@ -143,12 +175,11 @@
     const p = products.find(x=>x.id===id);
     if(!p) return alert('Not found');
     $('#pTitle').value = p.title; $('#pPrice').value = p.price; $('#pCategory').value = p.category; $('#pImage').value = p.image; $('#pDesc').value = p.description;
-    // remove old and let Add button re-add updated
     deleteProduct(id);
     window.scrollTo({top:0, behavior:'smooth'});
   }
 
-  // Notice board
+  // Notice
   $('#saveNotice').addEventListener('click', ()=> {
     const n = $('#noticeText').value.trim();
     localStorage.setItem(K_NOTICE, n);
@@ -162,7 +193,7 @@
     $('#noticeText').value = n;
   }
 
-  // orders
+  // Orders
   $('#refreshOrders').addEventListener('click', renderOrders);
   $('#clearOrders').addEventListener('click', ()=>{
     if(confirm('Clear all orders?')){ localStorage.removeItem(K_ORDERS); renderOrders(); alert('Orders cleared'); }
@@ -205,24 +236,11 @@
     const o = orders.find(x=>x.id === orderId);
     if(!o) return alert('Order not found');
     const msg = `Namaste ${o.name},%0AYour order (${o.id}) status: ${encodeURIComponent(o.status)}.%0AItems:%0A${o.items.map(it=>encodeURIComponent(it.title)+' x'+it.qty).join('%0A')}%0AThank you.`;
-    // opens chat with customer (their mobile)
     if(!o.mobile) return alert('Customer mobile not available');
     window.open(`https://wa.me/${o.mobile.replace(/\D/g,'')}?text=${msg}`,'_blank');
   }
 
-  function changeStatus(id, status){ // defined twice to ensure availability
-    let orders = load(K_ORDERS) || [];
-    const o = orders.find(x=>x.id === id);
-    if(!o) return;
-    o.status = status;
-    save(K_ORDERS, orders);
-    renderOrders();
-    alert('Order status updated to ' + status);
-  }
-
   function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
-
-  // initial admin screen stays hidden until login
 </script>
 </body>
 </html>
