@@ -1,178 +1,85 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="hi">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Nilgiri Local Store</title>
 <style>
-  body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f5f7fb}
-  header{background:#0ea5e9;color:#fff;padding:14px 12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap}
-  .actions{display:flex;gap:8px;align-items:center}
-  .btn{background:#0ea5e9;color:#fff;border:none;padding:8px 10px;border-radius:8px;cursor:pointer}
-  .btn.secondary{background:#fff;color:#0ea5e9;border:1px solid #0ea5e9}
-  .container{max-width:1100px;margin:18px auto;padding:12px;display:grid;grid-template-columns:1fr 360px;gap:16px}
-  .card{background:#fff;padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.04)}
-  .notice{background:#fff3cd;border:1px solid #ffe8a1;padding:10px;border-radius:8px;margin-bottom:12px}
-  .title{text-align:center;margin:12px 0}
-  .title h2{color:#ff5722;margin:0;font-size:22px}
-  .title p{margin:6px 0;color:#333}
-  #productList{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
-  .prod{border:1px solid #eee;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
-  .imgwrap{height:140px;border-radius:6px;overflow:hidden;background:#f1f5f9;display:flex;align-items:center;justify-content:center}
-  .imgwrap img{width:100%;height:100%;object-fit:cover}
-  .muted{color:#666;font-size:13px}
-  .qty{display:flex;align-items:center;gap:8px}
-  .qty button{padding:6px 8px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer}
-  #cartModal{position:fixed;left:0;right:0;top:0;bottom:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:999}
-  #cartBox{background:#fff;width:95%;max-width:700px;padding:12px;border-radius:8px;max-height:80vh;overflow:auto}
-  footer{padding:12px;text-align:center;color:#666;margin-top:18px}
-  @media(max-width:900px){ .container{grid-template-columns:1fr} header{justify-content:center} }
+body{font-family:Arial,sans-serif;margin:0;background:#f5f7fb}
+header{background:#0ea5e9;color:#fff;padding:14px 12px;display:flex;justify-content:space-between;align-items:center}
+header button{padding:8px 10px;border:none;border-radius:8px;cursor:pointer}
+.container{max-width:1100px;margin:18px auto;padding:12px;display:grid;grid-template-columns:1fr 300px;gap:16px}
+.card{background:#fff;padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.04)}
+.muted{color:#666;font-size:13px}
+#productList{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.prod{border:1px solid #eee;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.imgwrap{height:140px;border-radius:6px;overflow:hidden;background:#f1f5f9;display:flex;align-items:center;justify-content:center}
+.imgwrap img{width:100%;height:100%;object-fit:cover}
 </style>
 </head>
 <body>
-
 <header>
-  <strong>Nilgiri Local Store</strong>
-  <div class="actions">
-    <button id="shareSite" class="btn secondary">Share</button>
-    <button id="btnCart" class="btn">Cart (<span id="cartCount">0</span>)</button>
-    <button id="btnAdmin" class="btn secondary">Admin</button>
-    <button id="btnLogout" class="btn" style="background:#ef4444">Logout</button>
-  </div>
+<strong>Nilgiri Local Store</strong>
+<div>
+<button id="btnAdmin">Admin</button>
+<button id="btnLogout" style="background:#ef4444;color:#fff">Logout</button>
+</div>
 </header>
 
 <div class="container">
-  <div>
-    <div id="noticeArea"></div>
-
-    <div class="title">
-      <h2>🛒 ताज़ा और भरोसेमंद सामान — सीधे आपके घर तक</h2>
-      <p>चुनिए, cart में जोड़िए और एक क्लिक में WhatsApp पर ऑर्डर भेजिए (Cash on Delivery).</p>
-    </div>
-
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-        <h3 style="margin:0">Products</h3>
-        <input id="search" placeholder="Search..." style="padding:8px;border-radius:8px;border:1px solid #ddd;min-width:220px" />
-      </div>
-      <div id="productList" style="margin-top:12px"></div>
-    </div>
-  </div>
-
-  <aside>
-    <div class="card">
-      <h4>आपका प्रोफ़ाइल</h4>
-      <div id="profileArea" class="muted"></div>
-    </div>
-
-    <div class="card">
-      <h4>Cart</h4>
-      <div id="miniCart" class="muted">Cart empty</div>
-      <div style="margin-top:10px;display:flex;gap:8px">
-        <button id="openCart" class="btn">Open Cart</button>
-      </div>
-    </div>
-  </aside>
+<div>
+<div id="productList"></div>
 </div>
-
-<!-- Cart Modal -->
-<div id="cartModal">
-  <div id="cartBox">
-    <h3>आपका Cart</h3>
-    <div id="cartItems"></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
-      <div><strong>Total: ₹<span id="cartTotal">0</span></strong></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button id="btnPlaceOrder" class="btn">Place Order (WhatsApp)</button>
-        <button id="closeCart" class="btn secondary">Close</button>
-      </div>
-    </div>
-  </div>
+<aside>
+<div class="card">
+<h4>Profile</h4>
+<div id="profileArea" class="muted"></div>
 </div>
-
-<footer></footer>
+</aside>
+</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBRTrBG-AsNvUMmBb2vMePNvAspZfi3zOs",
-  authDomain: "nilgiri-store.firebaseapp.com",
-  projectId: "nilgiri-store",
-  storageBucket: "nilgiri-store.firebasestorage.app",
-  messagingSenderId: "556171236549",
-  appId: "1:556171236549:web:5df5741c44ea8d9bfc8cac"
+apiKey: "AIzaSyBRTrBG-AsNvUMmBb2vMePNvAspZfi3zOs",
+authDomain: "nilgiri-store.firebaseapp.com",
+projectId: "nilgiri-store",
+storageBucket: "nilgiri-store.firebasestorage.app",
+messagingSenderId: "556171236549",
+appId: "1:556171236549:web:5df5741c44ea8d9bfc8cac"
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const OWNER_WHATSAPP = '+917089955265';
-const ADMIN_PAGE = 'admin.html';
 const K_USER = 'np_user';
 const K_CART = 'np_cart_v7';
+const ADMIN_PAGE = 'admin.html';
 
-const $ = s => document.querySelector(s);
-const $$ = s => Array.from(document.querySelectorAll(s));
-const load = k => JSON.parse(localStorage.getItem(k) || 'null');
-const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
-function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+const load = k=>JSON.parse(localStorage.getItem(k)||'null');
+const save = (k,v)=>localStorage.setItem(k,JSON.stringify(v));
 
-/* ===== USER CHECK ===== */
 let user = load(K_USER);
-if(!user){ window.location.href = 'register.html'; }
+if(!user) window.location.href='register.html';
+else document.getElementById('profileArea').innerText=`${user.name}\nMobile: ${user.mobile}\nBlock: ${user.block} | Flat: ${user.flat}`;
 
-/* ===== FIRESTORE SUBSCRIPTIONS ===== */
-const productsRef = collection(db, 'products');
-onSnapshot(productsRef, snap => {
-  const products = snap.docs.map(d=>({id:d.id, ...d.data()}));
-  renderProducts(products);
-});
-
-const noticeRef = doc(db, 'config', 'notice');
-onSnapshot(noticeRef, d=>{
-  const noticeText = d.exists()? (d.data().text || '') : '';
-  $('#noticeArea').innerHTML = noticeText ? `<div class="notice"><strong>Notice:</strong> ${escapeHtml(noticeText)}</div>` : '';
-});
-
-/* ===== RENDER FUNCTIONS ===== */
-function renderProfile(){
-  user = load(K_USER);
-  $('#profileArea').innerHTML = user ? `<strong>${escapeHtml(user.name)}</strong><div class="muted">Mobile: ${escapeHtml(user.mobile)}</div><div class="muted">Block: ${escapeHtml(user.block)} | Flat: ${escapeHtml(user.flat)}</div>` : 'Not logged';
-}
-
-function renderProducts(products){
-  const q = ($('#search').value||'').trim().toLowerCase();
-  const list = (products||[]).filter(p=>{
-    if(!q) return true;
-    return (p.title||'').toLowerCase().includes(q) || (p.description||'').toLowerCase().includes(q) || (p.category||'').toLowerCase().includes(q);
-  });
-  const container = $('#productList'); container.innerHTML = '';
-  if(list.length===0){ container.innerHTML = '<div class="muted">कोई product नहीं मिला।</div>'; return; }
-  list.forEach(p=>{
+const productsRef = collection(db,'products');
+onSnapshot(productsRef,(snap)=>{
+  const products = snap.docs.map(d=>({id:d.id,...d.data()}));
+  const container = document.getElementById('productList');
+  container.innerHTML='';
+  products.forEach(p=>{
     const div = document.createElement('div'); div.className='prod';
-    const imgHtml = p.image ? `<img src="${p.image}" alt="${escapeHtml(p.title)}">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#999">No Image</div>`;
-    div.innerHTML = `<div class="imgwrap">${imgHtml}</div>
-      <div><strong>${escapeHtml(p.title||'')}</strong></div>
-      <div class="muted">₹${p.price || 0} • ${escapeHtml(p.category||'General')}</div>
-      <div class="muted" style="font-size:13px">${escapeHtml(p.description||'')}</div>`;
+    div.innerHTML=`<div class="imgwrap">${p.image?`<img src="${p.image}">`:'No Image'}</div>
+    <div><strong>${p.title}</strong></div>
+    <div>₹${p.price}</div>`;
     container.appendChild(div);
   });
-}
-
-/* ===== LOGOUT & ADMIN ===== */
-$('#btnLogout').addEventListener('click', ()=>{
-  localStorage.removeItem(K_USER);
-  window.location.href='register.html';
 });
 
-$('#btnAdmin').addEventListener('click', ()=>{
-  window.location.href = ADMIN_PAGE;
-});
-
-/* ===== INITIAL ===== */
-$('#search').addEventListener('input', ()=>{ productsRef; }); // live filter
-renderProfile();
+document.getElementById('btnLogout').onclick=()=>{ localStorage.removeItem(K_USER); window.location.href='register.html'; }
+document.getElementById('btnAdmin').onclick=()=>window.location.href=ADMIN_PAGE;
 </script>
 </body>
 </html>

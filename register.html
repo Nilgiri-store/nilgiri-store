@@ -1,25 +1,26 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="hi">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nilgiri Local Store - Register</title>
+<title>Register - Nilgiri Local Store</title>
 <style>
-  body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f5f7fb;display:flex;justify-content:center;align-items:center;height:100vh}
-  .card{background:#fff;padding:24px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.1);width:100%;max-width:400px}
-  h2{text-align:center;color:#0ea5e9;margin-bottom:20px}
-  input{width:100%;padding:10px;margin:8px 0;border-radius:6px;border:1px solid #ddd}
-  button{width:100%;padding:10px;margin-top:12px;background:#0ea5e9;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:16px}
+body{font-family:Arial,sans-serif;margin:0;padding:0;background:#f5f7fb;display:flex;justify-content:center;align-items:center;height:100vh}
+.container{background:#fff;padding:24px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,0.1);width:320px}
+h2{text-align:center;color:#0ea5e9}
+input{width:100%;padding:10px;margin:8px 0;border-radius:6px;border:1px solid #ccc}
+button{width:100%;padding:10px;background:#0ea5e9;color:#fff;border:none;border-radius:6px;cursor:pointer}
 </style>
 </head>
 <body>
-<div class="card">
-  <h2>Register</h2>
-  <input id="name" placeholder="Name">
-  <input id="mobile" placeholder="Mobile Number">
-  <input id="block" placeholder="Block Number">
-  <input id="flat" placeholder="Flat Number">
-  <button id="btnRegister">Register</button>
+<div class="container">
+<h2>Register</h2>
+<input type="text" id="name" placeholder="पूरा नाम" required>
+<input type="text" id="mobile" placeholder="मोबाइल नंबर" required>
+<input type="text" id="block" placeholder="Block" required>
+<input type="text" id="flat" placeholder="Flat No." required>
+<button id="btnRegister">Register</button>
+<p id="msg" style="color:red;text-align:center;"></p>
 </div>
 
 <script type="module">
@@ -27,42 +28,35 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/fireba
 import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBRTrBG-AsNvUMmBb2vMePNvAspZfi3zOs",
-  authDomain: "nilgiri-store.firebaseapp.com",
-  projectId: "nilgiri-store",
-  storageBucket: "nilgiri-store.firebasestorage.app",
-  messagingSenderId: "556171236549",
-  appId: "1:556171236549:web:5df5741c44ea8d9bfc8cac"
+apiKey: "AIzaSyBRTrBG-AsNvUMmBb2vMePNvAspZfi3zOs",
+authDomain: "nilgiri-store.firebaseapp.com",
+projectId: "nilgiri-store",
+storageBucket: "nilgiri-store.firebasestorage.app",
+messagingSenderId: "556171236549",
+appId: "1:556171236549:web:5df5741c44ea8d9bfc8cac"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const K_USER = 'np_user';
 
-document.getElementById('btnRegister').addEventListener('click', async ()=>{
-    const name = document.getElementById('name').value.trim();
-    const mobile = document.getElementById('mobile').value.trim();
-    const block = document.getElementById('block').value.trim();
-    const flat = document.getElementById('flat').value.trim();
+const save = (k,v)=>localStorage.setItem(k,JSON.stringify(v));
 
-    if(!name || !mobile){ alert('Name & Mobile required'); return; }
-
-    const userObj = { name, mobile, block, flat, created: new Date() };
-
-    try {
-        // Firebase me save
-        await addDoc(collection(db, 'users'), userObj);
-
-        // LocalStorage me bhi save
-        localStorage.setItem(K_USER, JSON.stringify(userObj));
-
-        // ✅ Save ho gaya, ab index.html redirect
-        window.location.href = 'index.html';
-    } catch(err) {
-        console.error(err);
-        alert('Registration failed, try again.');
-    }
-});
+document.getElementById('btnRegister').onclick = async ()=>{
+  const name = document.getElementById('name').value.trim();
+  const mobile = document.getElementById('mobile').value.trim();
+  const block = document.getElementById('block').value.trim();
+  const flat = document.getElementById('flat').value.trim();
+  const msg = document.getElementById('msg');
+  if(!name || !mobile || !block || !flat){ msg.innerText="सभी फ़ील्ड भरें"; return; }
+  const userData = { name, mobile, block, flat, createdAt: new Date().toISOString() };
+  try{
+    await addDoc(collection(db,'users'),userData);
+    save(K_USER,userData);
+    window.location.href='index.html';
+  }catch(e){ console.error(e); msg.innerText="Registration failed";}
+};
 </script>
 </body>
 </html>
