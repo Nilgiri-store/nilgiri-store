@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Admin - Nilgiri Store</title>
+<title>Admin - Nilgiri Local Store</title>
 <style>
   body{font-family:Arial,Helvetica,sans-serif;background:#f3f4f6;margin:0;padding:18px}
   .wrap{max-width:1100px;margin:0 auto}
@@ -17,7 +17,6 @@
   .prod-row{display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid #eee}
   .prod-row img{width:86px;height:56px;object-fit:cover;border-radius:6px}
   .actions{display:flex;gap:8px}
-  .status-select{padding:6px;border-radius:6px}
   .hide{display:none}
 </style>
 </head>
@@ -30,23 +29,25 @@
         <button id="adminLoginBtn">Login</button>
         <button id="backHome" class="btn-muted">Back Home</button>
       </div>
+      <div class="muted" style="margin-top:6px">Only store owner/manager ke liye.</div>
     </div>
 
     <div id="adminArea" class="hide">
       <div class="card">
-        <h3>Add Product</h3>
+        <h3>Add / Edit Product</h3>
         <input id="pTitle" placeholder="Title" />
         <div class="row">
           <input id="pPrice" placeholder="Selling Price (₹)" />
-          <input id="pCostPrice" placeholder="Cost Price (₹)" /> <!-- नया फ़ील्ड -->
+          <input id="pCostPrice" placeholder="Cost Price (₹)" />
           <input id="pCategory" placeholder="Category" />
         </div>
         <input id="pImage" placeholder="Image URL" />
         <textarea id="pDesc" placeholder="Description"></textarea>
         <div style="display:flex;gap:8px;margin-top:8px">
-          <button id="addProductBtn">Add Product</button>
-          <button id="clearProducts" class="btn-muted">Clear All Products</button>
+          <button id="saveProductBtn">Save Product</button>
+          <button id="resetForm" class="btn-muted">Reset Form</button>
         </div>
+        <div class="muted" id="editInfo"></div>
       </div>
 
       <div class="card">
@@ -62,139 +63,149 @@
         <h3>Products</h3>
         <div id="productsList"></div>
       </div>
-
-      <div class="card">
-        <h3>Orders</h3>
-        <div style="display:flex;gap:8px;margin-bottom:8px">
-          <button id="refreshOrders">Refresh</button>
-          <button id="clearOrders" class="btn-muted">Clear All Orders</button>
-        </div>
-        <div><strong>Total Profit: ₹<span id="totalProfit">0</span></strong></div>
-        <div id="ordersList" style="margin-top:10px;"></div>
-      </div>
     </div>
   </div>
 
-<script>
+<script type="module">
   const ADMIN_PW = '5702';
-  const K_PRODUCTS = 'np_products_v7';
-  const K_ORDERS = 'np_orders_v7';
-  const K_NOTICE = 'np_notice_v1';
+
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+  import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBRTrBG-AsNvUMmBb2vMePNvAspZfi3zOs",
+    authDomain: "nilgiri-store.firebaseapp.com",
+    projectId: "nilgiri-store",
+    storageBucket: "nilgiri-store.firebasestorage.app",
+    messagingSenderId: "556171236549",
+    appId: "1:556171236549:web:5df5741c44ea8d9bfc8cac"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
   const $ = s => document.querySelector(s);
-  const load = k => JSON.parse(localStorage.getItem(k) || 'null');
-  const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
-  const uid = ()=> 'id'+Date.now().toString(36);
+  const escapeHtml = s => s ? String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]) : '';
 
   $('#backHome').addEventListener('click', ()=> window.location.href='index.html');
 
+  // Login gate
   $('#adminLoginBtn').addEventListener('click', ()=>{
     const pw = $('#adminPass').value || '';
     if(pw === ADMIN_PW){
       $('#adminArea').classList.remove('hide');
+      subscribeProducts();
+      loadNotice();
       alert('Admin logged in');
-      renderProducts(); renderOrders(); renderNotice();
     } else alert('Wrong password');
   });
 
-  // add product
-  $('#addProductBtn').addEventListener('click', ()=>{
+  /* ===== Products ===== */
+  let editId = null;
+  const productsRef = collection(db, 'products');
+
+  function subscribeProducts(){
+    onSnapshot(productsRef, (snap)=>{
+      const list = snap.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=> (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+      renderProducts(list);
+    });
+  }
+
+  function renderProducts(products){
+    const node = $('#productsList'); node.innerHTML = '';
+    if(!products.length){ node.innerHTML = '<div class="muted">No products</div>'; return; }
+    products.forEach(p=>{
+      const d = document.createElement('div'); d.className='prod-row';
+      const img = p.image ? `<img src="${p.image}" />` : `<div style="width:86px;height:56px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#999">No Img</div>`;
+      d.innerHTML = `${img}
+        <div style="flex:1">
+          <strong>${escapeHtml(p.title||'')}</strong>
+          <div class="muted">Selling ₹${p.price||0} | Cost ₹${p.costPrice||0} • ${escapeHtml(p.category||'General')}</div>
+          <div class="muted" style="margin-top:6px">${escapeHtml(p.description||'')}</div>
+        </div>
+        <div class="actions">
+          <button data-id="${p.id}" class="btn-edit">Edit</button>
+          <button data-id="${p.id}" class="btn-delete" style="background:#ef4444">Delete</button>
+        </div>`;
+      node.appendChild(d);
+    });
+
+    // attach actions
+    node.querySelectorAll('.btn-edit').forEach(b=>{
+      b.onclick = async ()=>{
+        const id = b.getAttribute('data-id');
+        editId = id;
+        const ref = doc(db, 'products', id);
+        const snap = await getDoc(ref);
+        if(!snap.exists()) return alert('Not found');
+        const p = snap.data();
+        $('#pTitle').value = p.title||'';
+        $('#pPrice').value = p.price||'';
+        $('#pCostPrice').value = p.costPrice||'';
+        $('#pCategory').value = p.category||'';
+        $('#pImage').value = p.image||'';
+        $('#pDesc').value = p.description||'';
+        $('#editInfo').innerText = `Editing: ${id}`;
+        window.scrollTo({top:0, behavior:'smooth'});
+      }
+    });
+    node.querySelectorAll('.btn-delete').forEach(b=>{
+      b.onclick = async ()=>{
+        const id = b.getAttribute('data-id');
+        if(!confirm('Delete product?')) return;
+        await deleteDoc(doc(db,'products',id));
+        if(editId===id){ resetForm(); }
+      }
+    });
+  }
+
+  function resetForm(){
+    editId = null;
+    $('#pTitle').value=''; $('#pPrice').value=''; $('#pCostPrice').value='';
+    $('#pCategory').value=''; $('#pImage').value=''; $('#pDesc').value='';
+    $('#editInfo').innerText='';
+  }
+  $('#resetForm').addEventListener('click', resetForm);
+
+  $('#saveProductBtn').addEventListener('click', async ()=>{
     const t = $('#pTitle').value.trim();
     const pr = parseFloat($('#pPrice').value) || 0;
-    const cp = parseFloat($('#pCostPrice').value) || 0; // लागत मूल्य
+    const cp = parseFloat($('#pCostPrice').value) || 0;
     const cat = $('#pCategory').value.trim() || 'General';
     const img = $('#pImage').value.trim() || '';
     const desc = $('#pDesc').value.trim() || '';
     if(!t || !pr){ alert('Title और Selling Price डालें'); return; }
-    let products = load(K_PRODUCTS) || [];
-    products.push({ id: uid(), title: t, price: pr, costPrice: cp, category: cat, image: img, description: desc });
-    save(K_PRODUCTS, products);
-    $('#pTitle').value=''; $('#pPrice').value=''; $('#pCostPrice').value=''; $('#pCategory').value=''; $('#pImage').value=''; $('#pDesc').value='';
-    renderProducts();
+
+    const payload = { title:t, price:pr, costPrice:cp, category:cat, image:img, description:desc, updatedAt:serverTimestamp() };
+    if(editId){
+      await setDoc(doc(db,'products',editId), payload, {merge:true});
+      alert('Product updated');
+    } else {
+      await addDoc(collection(db,'products'), { ...payload, createdAt:serverTimestamp() });
+      alert('Product added');
+    }
+    resetForm();
   });
 
-  $('#clearProducts').addEventListener('click', ()=>{
-    if(confirm('सभी products हटाए जाएँगे?')){ localStorage.removeItem(K_PRODUCTS); renderProducts(); alert('Products cleared'); }
-  });
+  /* ===== Notice ===== */
+  const noticeRef = doc(db, 'config', 'notice');
 
-  function renderProducts(){
-    const node = $('#productsList'); node.innerHTML = '';
-    const products = load(K_PRODUCTS) || [];
-    if(!products || products.length===0){ node.innerHTML = '<div class="muted">No products</div>'; return; }
-    products.slice().reverse().forEach(p=>{
-      const d = document.createElement('div'); d.className='prod-row';
-      const img = p.image ? `<img src="${p.image}" />` : `<div style="width:86px;height:56px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#999">No Img</div>`;
-      d.innerHTML = `${img}<div style="flex:1"><strong>${escapeHtml(p.title)}</strong><div class="muted">Selling ₹${p.price} | Cost ₹${p.costPrice || 0} • ${escapeHtml(p.category)}</div><div class="muted" style="margin-top:6px">${escapeHtml(p.description)}</div></div>
-        <div class="actions">
-          <button onclick="editProduct('${p.id}')">Edit</button>
-          <button onclick="deleteProduct('${p.id}')" style="background:#ef4444">Delete</button>
-        </div>`;
-      node.appendChild(d);
-    });
+  async function loadNotice(){
+    const snap = await getDoc(noticeRef);
+    $('#noticeText').value = snap.exists() ? (snap.data().text || '') : '';
   }
 
-  function deleteProduct(id){
-    if(!confirm('Delete product?')) return;
-    let products = load(K_PRODUCTS) || [];
-    products = products.filter(p=>p.id !== id);
-    save(K_PRODUCTS, products);
-    renderProducts();
-  }
-
-  function editProduct(id){
-    let products = load(K_PRODUCTS) || [];
-    const p = products.find(x=>x.id===id);
-    if(!p) return alert('Not found');
-    $('#pTitle').value = p.title; $('#pPrice').value = p.price; $('#pCostPrice').value = p.costPrice || 0; $('#pCategory').value = p.category; $('#pImage').value = p.image; $('#pDesc').value = p.description;
-    deleteProduct(id);
-    window.scrollTo({top:0, behavior:'smooth'});
-  }
-
-  // Notice board
-  $('#saveNotice').addEventListener('click', ()=> {
-    const n = $('#noticeText').value.trim();
-    localStorage.setItem(K_NOTICE, n);
+  $('#saveNotice').addEventListener('click', async ()=>{
+    const text = $('#noticeText').value.trim();
+    await setDoc(noticeRef, { text, updatedAt: serverTimestamp() }, { merge:true });
     alert('Notice saved');
   });
-  $('#clearNotice').addEventListener('click', ()=> {
-    if(confirm('Clear notice?')){ localStorage.removeItem(K_NOTICE); $('#noticeText').value=''; alert('Notice cleared'); }
+
+  $('#clearNotice').addEventListener('click', async ()=>{
+    if(!confirm('Clear notice?')) return;
+    await setDoc(noticeRef, { text: '' , updatedAt: serverTimestamp() }, { merge:true });
+    $('#noticeText').value = '';
+    alert('Notice cleared');
   });
-  function renderNotice(){
-    const n = localStorage.getItem(K_NOTICE) || '';
-    $('#noticeText').value = n;
-  }
-
-  // orders
-  $('#refreshOrders').addEventListener('click', renderOrders);
-  $('#clearOrders').addEventListener('click', ()=>{
-    if(confirm('Clear all orders?')){ localStorage.removeItem(K_ORDERS); renderOrders(); alert('Orders cleared'); }
-  });
-
-  function renderOrders(){
-    const node = $('#ordersList'); node.innerHTML = '';
-    const orders = load(K_ORDERS) || [];
-    let totalProfit = 0;
-    if(!orders || orders.length===0){ node.innerHTML = '<div class="muted">No orders</div>'; $('#totalProfit').innerText = 0; return; }
-    orders.slice().reverse().forEach(o=>{
-      let orderProfit = 0;
-      o.items.forEach(it=>{
-        const product = (load(K_PRODUCTS) || []).find(p=>p.title === it.title);
-        if(product){
-          const profitPerItem = (product.price - (product.costPrice || 0));
-          orderProfit += profitPerItem * it.qty;
-        }
-      });
-      totalProfit += orderProfit;
-      const div = document.createElement('div'); div.className='card'; div.style.marginBottom='8px';
-      div.innerHTML = `<div style="display:flex;justify-content:space-between"><div><strong>${escapeHtml(o.name)}</strong><div class="muted">${o.mobile} • Block:${escapeHtml(o.block)} | Flat:${escapeHtml(o.flat)}</div></div><div class="muted">${new Date(o.createdAt).toLocaleString()}</div></div>
-        <div style="margin-top:8px">${o.items.map(it=>escapeHtml(it.title)+' x'+it.qty).join('<br>')}</div>
-        <div style="margin-top:8px"><strong>Total: ₹${o.total}</strong> | <span class="muted">Profit: ₹${orderProfit.toFixed(2)}</span></div>`;
-      node.appendChild(div);
-    });
-    $('#totalProfit').innerText = totalProfit.toFixed(2);
-  }
-
-  function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
 </script>
 </body>
 </html>
