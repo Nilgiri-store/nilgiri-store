@@ -1,85 +1,35 @@
 <!DOCTYPE html>
 <html lang="hi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nilgiri Local Store</title>
-<style>
-body{font-family:Arial,sans-serif;margin:0;background:#f5f7fb}
-header{background:#0ea5e9;color:#fff;padding:14px 12px;display:flex;justify-content:space-between;align-items:center}
-header button{padding:8px 10px;border:none;border-radius:8px;cursor:pointer}
-.container{max-width:1100px;margin:18px auto;padding:12px;display:grid;grid-template-columns:1fr 300px;gap:16px}
-.card{background:#fff;padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.04)}
-.muted{color:#666;font-size:13px}
-#productList{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
-.prod{border:1px solid #eee;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
-.imgwrap{height:140px;border-radius:6px;overflow:hidden;background:#f1f5f9;display:flex;align-items:center;justify-content:center}
-.imgwrap img{width:100%;height:100%;object-fit:cover}
-</style>
+  <meta charset="UTF-8">
+  <title>Nilgiri Store</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
 </head>
 <body>
-<header>
-<strong>Nilgiri Local Store</strong>
-<div>
-<button id="btnAdmin">Admin</button>
-<button id="btnLogout" style="background:#ef4444;color:#fff">Logout</button>
-</div>
-</header>
+  <h2>Available Products</h2>
+  <ul id="products"></ul>
 
-<div class="container">
-<div>
-<div id="productList"></div>
-</div>
-<aside>
-<div class="card">
-<h4>Profile</h4>
-<div id="profileArea" class="muted"></div>
-</div>
-</aside>
-</div>
+<script>
+  // Firebase Config (same as admin.html)
+  const firebaseConfig = {
+    apiKey: "AIzaSy....",
+    authDomain: "yourapp.firebaseapp.com",
+    projectId: "yourapp",
+  };
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
-import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
-
-const firebaseConfig = {
-apiKey: "AIzaSyBRTrBG-AsNvUMmBb2vMePNvAspZfi3zOs",
-authDomain: "nilgiri-store.firebaseapp.com",
-projectId: "nilgiri-store",
-storageBucket: "nilgiri-store.firebasestorage.app",
-messagingSenderId: "556171236549",
-appId: "1:556171236549:web:5df5741c44ea8d9bfc8cac"
-};
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-const K_USER = 'np_user';
-const K_CART = 'np_cart_v7';
-const ADMIN_PAGE = 'admin.html';
-
-const load = k=>JSON.parse(localStorage.getItem(k)||'null');
-const save = (k,v)=>localStorage.setItem(k,JSON.stringify(v));
-
-let user = load(K_USER);
-if(!user) window.location.href='register.html';
-else document.getElementById('profileArea').innerText=`${user.name}\nMobile: ${user.mobile}\nBlock: ${user.block} | Flat: ${user.flat}`;
-
-const productsRef = collection(db,'products');
-onSnapshot(productsRef,(snap)=>{
-  const products = snap.docs.map(d=>({id:d.id,...d.data()}));
-  const container = document.getElementById('productList');
-  container.innerHTML='';
-  products.forEach(p=>{
-    const div = document.createElement('div'); div.className='prod';
-    div.innerHTML=`<div class="imgwrap">${p.image?`<img src="${p.image}">`:'No Image'}</div>
-    <div><strong>${p.title}</strong></div>
-    <div>₹${p.price}</div>`;
-    container.appendChild(div);
+  // Real-time Product Listener
+  db.collection("products").onSnapshot(snapshot=>{
+    let list = document.getElementById("products");
+    list.innerHTML = "";
+    snapshot.forEach(doc=>{
+      let li = document.createElement("li");
+      li.textContent = doc.data().name + " - ₹" + doc.data().price;
+      list.appendChild(li);
+    });
   });
-});
-
-document.getElementById('btnLogout').onclick=()=>{ localStorage.removeItem(K_USER); window.location.href='register.html'; }
-document.getElementById('btnAdmin').onclick=()=>window.location.href=ADMIN_PAGE;
 </script>
 </body>
 </html>

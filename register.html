@@ -1,62 +1,74 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="hi">
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Register - Nilgiri Local Store</title>
+<title>Register - Nilgiri Parishad Store</title>
 <style>
-body{font-family:Arial,sans-serif;margin:0;padding:0;background:#f5f7fb;display:flex;justify-content:center;align-items:center;height:100vh}
-.container{background:#fff;padding:24px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,0.1);width:320px}
-h2{text-align:center;color:#0ea5e9}
-input{width:100%;padding:10px;margin:8px 0;border-radius:6px;border:1px solid #ccc}
-button{width:100%;padding:10px;background:#0ea5e9;color:#fff;border:none;border-radius:6px;cursor:pointer}
+  body{font-family:Arial,Helvetica,sans-serif;background:#f3f4f6;margin:0;padding:20px}
+  .box{max-width:460px;margin:40px auto;background:#fff;padding:18px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06)}
+  h2{margin:0 0 12px}
+  input{width:100%;padding:10px;margin:8px 0;border-radius:6px;border:1px solid #ddd;font-size:15px}
+  .row{display:flex;gap:8px}
+  .captcha{display:flex;gap:8px;align-items:center;margin:8px 0}
+  .cap-box{background:#efefef;padding:8px 12px;border-radius:6px;font-weight:bold;letter-spacing:4px}
+  button{background:#0ea5e9;color:white;border:none;padding:10px 14px;border-radius:6px;cursor:pointer;font-size:15px}
+  .muted{color:#666;font-size:13px;margin-top:8px}
 </style>
 </head>
 <body>
-<div class="container">
-<h2>Register</h2>
-<input type="text" id="name" placeholder="पूरा नाम" required>
-<input type="text" id="mobile" placeholder="मोबाइल नंबर" required>
-<input type="text" id="block" placeholder="Block" required>
-<input type="text" id="flat" placeholder="Flat No." required>
-<button id="btnRegister">Register</button>
-<p id="msg" style="color:red;text-align:center;"></p>
-</div>
+  <div class="box">
+    <h2>रजिस्टर / लॉगिन</h2>
+    <input id="name" placeholder="पूरा नाम (जैसे: राम कुमार)" />
+    <input id="mobile" placeholder="मोबाइल नंबर (10 अंक)" maxlength="10" />
+    <div class="row">
+      <input id="block" placeholder="Block (उदा. A09)" />
+      <input id="flat" placeholder="Flat No. (उदा. 202)" />
+    </div>
+    <input value="Nilgiri Parishad" disabled style="margin-top:6px" />
+    <div class="captcha">
+      <div id="captchaText" class="cap-box">-----</div>
+      <button type="button" id="refreshCaptcha">Refresh</button>
+    </div>
+    <input id="captchaInput" placeholder="CAPTCHA code यहाँ डालें" />
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button id="btnRegister">रजिस्टर करें</button>
+      <button id="btnGuest" style="background:#fff;color:#0ea5e9;border:1px solid #0ea5e9">Guest के रूप में जारी रखें</button>
+    </div>
+    <div class="muted">रजिस्ट्रेशन के बाद आप Home पर पहुँचेंगे। (CAPTCHA आवश्यक)</div>
+  </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
-import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+<script>
+  // Simple front-end CAPTCHA
+  function genCaptcha(){
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let s = "";
+    for(let i=0;i<5;i++) s += chars.charAt(Math.floor(Math.random()*chars.length));
+    document.getElementById('captchaText').innerText = s;
+  }
+  document.getElementById('refreshCaptcha').addEventListener('click', genCaptcha);
+  genCaptcha();
 
-const firebaseConfig = {
-apiKey: "AIzaSyBRTrBG-AsNvUMmBb2vMePNvAspZfi3zOs",
-authDomain: "nilgiri-store.firebaseapp.com",
-projectId: "nilgiri-store",
-storageBucket: "nilgiri-store.firebasestorage.app",
-messagingSenderId: "556171236549",
-appId: "1:556171236549:web:5df5741c44ea8d9bfc8cac"
-};
+  document.getElementById('btnRegister').addEventListener('click', function(){
+    const name = document.getElementById('name').value.trim();
+    const mobile = document.getElementById('mobile').value.trim();
+    const block = document.getElementById('block').value.trim().toUpperCase();
+    const flat = document.getElementById('flat').value.trim();
+    const cap = document.getElementById('captchaText').innerText.trim();
+    const userCap = document.getElementById('captchaInput').value.trim();
+    if(!name || !mobile || !block || !flat){ alert('कृपया सभी फ़ील्ड भरें'); return; }
+    if(!/^[6-9]\d{9}$/.test(mobile)){ alert('Valid 10-digit Indian mobile number डालें'); return; }
+    if(cap !== userCap){ alert('CAPTCHA गलत है'); genCaptcha(); return; }
+    const user = { id:'u'+Date.now(), name, mobile, block, flat };
+    localStorage.setItem('np_user', JSON.stringify(user));
+    window.location.href = 'index.html';
+  });
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-const K_USER = 'np_user';
-
-const save = (k,v)=>localStorage.setItem(k,JSON.stringify(v));
-
-document.getElementById('btnRegister').onclick = async ()=>{
-  const name = document.getElementById('name').value.trim();
-  const mobile = document.getElementById('mobile').value.trim();
-  const block = document.getElementById('block').value.trim();
-  const flat = document.getElementById('flat').value.trim();
-  const msg = document.getElementById('msg');
-  if(!name || !mobile || !block || !flat){ msg.innerText="सभी फ़ील्ड भरें"; return; }
-  const userData = { name, mobile, block, flat, createdAt: new Date().toISOString() };
-  try{
-    await addDoc(collection(db,'users'),userData);
-    save(K_USER,userData);
-    window.location.href='index.html';
-  }catch(e){ console.error(e); msg.innerText="Registration failed";}
-};
+  document.getElementById('btnGuest').addEventListener('click', ()=>{
+    const guest = { id:'g'+Date.now(), name:'Guest', mobile:'', block:'', flat:'', guest:true };
+    localStorage.setItem('np_user', JSON.stringify(guest));
+    window.location.href = 'index.html';
+  });
 </script>
 </body>
 </html>
